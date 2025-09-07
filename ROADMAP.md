@@ -15,7 +15,7 @@
 - [ ] Persist last 10 queries (local JSON; later Firebase).
 - [ ] Deploy preview (Render/Fly/Heroku) + env management; server-only API key.
 - [ ] Add loading states, retry, copy-to-clipboard.
-- [ ] Token/latency logging (simple console/CSV).
+- [x] Token/latency logging (simple console/CSV).
 
 ## Later (Week 4–6)
 
@@ -44,3 +44,4 @@
  - 2025‑09‑07: Added formal tests (Vitest + Supertest) and updated npm scripts; retained optional offline smoke script.
  - 2025‑09‑07: Chose Render Web Service for deployment; added `render.yaml` blueprint with auto‑deploy on merges to `main`.
  - 2025‑09‑07: Enabled Render PR previews in `render.yaml` and added a "Deploy to Render" button in README for easy sharing.
+ - 2025‑09‑07: Added metrics logging (CSV) with latency and token usage.

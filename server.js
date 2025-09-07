@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
+import fs from 'fs/promises';
 import { validateSuggestRequest, mockPlan } from './src/logic.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +16,23 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Metrics: latency and token usage (CSV file)
+const LOGS_DIR = path.join(__dirname, 'logs');
+const METRICS_FILE = path.join(LOGS_DIR, 'metrics.csv');
+
+async function logMetrics({ latencyMs, usage, model, ok = true, error = '' }) {
+  try {
+    await fs.mkdir(LOGS_DIR, { recursive: true });
+    let header = '';
+    try { await fs.stat(METRICS_FILE); } catch { header = 'timestamp,latency_ms,input_tokens,output_tokens,total_tokens,model,ok,error\n'; }
+    const input = usage?.input_tokens ?? usage?.prompt_tokens ?? '';
+    const output = usage?.output_tokens ?? usage?.completion_tokens ?? '';
+    const total = usage?.total_tokens ?? (Number(input||0) + Number(output||0) || '');
+    const line = `${new Date().toISOString()},${latencyMs},${input},${output},${total},${model},${ok?1:0},${String(error).replaceAll('\n',' ').replaceAll(',',';')}\n`;
+    await fs.appendFile(METRICS_FILE, header + line, 'utf8');
+  } catch {}
+}
 
 // Helper: extract JSON from various SDK response shapes
 function extractJson(res) {
@@ -49,11 +67,22 @@ function extractJson(res) {
   throw new Error('Failed to extract JSON from model response.');
 }
 
+function extractUsage(res) {
+  const u = res?.usage || res?.response?.usage;
+  if (!u) return null;
+  return {
+    input_tokens: u.input_tokens ?? u.prompt_tokens ?? null,
+    output_tokens: u.output_tokens ?? u.completion_tokens ?? null,
+    total_tokens: u.total_tokens ?? null
+  };
+}
+
 // validation + mock moved to src/logic.js to enable offline tests
 
 // API: /suggest
 app.post('/suggest', async (req, res) => {
   try {
+    const started = Date.now();
     const { valid, errors, value } = validateSuggestRequest(req.body || {});
     if (!valid) return res.status(400).json({ error: 'Invalid request', details: errors });
 
@@ -61,7 +90,9 @@ app.post('/suggest', async (req, res) => {
 
     // Mock mode for local tests or offline development
     if (process.env.MOCK_OPENAI === '1') {
-      return res.json(mockPlan({ destination, dates: { start, end }, travelers, budgetUSD }));
+      const mocked = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD });
+      await logMetrics({ latencyMs: Date.now() - started, usage: null, model: 'mock', ok: true });
+      return res.json(mocked);
     }
 
     const schema = {
@@ -124,11 +155,13 @@ Return a short plan following the JSON schema.` }
     });
 
     const data = extractJson(resp);
+    await logMetrics({ latencyMs: Date.now() - started, usage: extractUsage(resp), model: resp?.model || 'responses', ok: true });
     res.json(data);
   } catch (err) {
     // If Responses API fails (older regions/SDK), fallback to chat.completions JSON
     if (!res.headersSent) {
       try {
+        const startedFallback = Date.now();
         const fallback = await client.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
@@ -138,12 +171,14 @@ Return a short plan following the JSON schema.` }
           response_format: { type: "json_object" }
         });
         const data = JSON.parse(fallback.choices[0].message.content);
+        await logMetrics({ latencyMs: Date.now() - startedFallback, usage: fallback?.usage, model: fallback?.model || 'chat.completions', ok: true });
         return res.json(data);
       } catch (e2) {
         console.error('Fallback error:', e2);
       }
     }
     console.error(err);
+    await logMetrics({ latencyMs: 0, usage: null, model: 'error', ok: false, error: String(err?.message || err) });
     res.status(400).json({ error: String(err?.message || err) });
   }
 });
