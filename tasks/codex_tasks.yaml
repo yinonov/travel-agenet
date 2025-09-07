@@ -1,0 +1,23 @@
+now:
+  - id: validation-errors
+    title: "Add input validation & error UX"
+  - id: ux-polish
+    title: "Loading/retry/copy-to-clipboard + disclaimer"
+  - id: smoke-tests
+    title: "API smoke tests (happy-path + malformed)"
+  - id: docs
+    title: "README screenshots + link ROADMAP"
+next:
+  - id: history
+    title: "Persist last 10 queries; /history endpoint + UI"
+  - id: deploy
+    title: "Dockerfile + Render/Heroku config"
+  - id: observability
+    title: "Log latency/token usage to CSV"
+later:
+  - id: datasource
+    title: "Integrate one real flight/hotel sandbox"
+  - id: tool-funcs
+    title: "Expose flightSearch/hotelLookup as typed functions"
+  - id: hardening
+    title: "Rate limits + schema guards"

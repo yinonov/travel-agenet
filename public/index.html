@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Travel Agent PoC</title>
+  <style>
+    :root{--b:#111827;--g:#f3f4f6;--bd:#e5e7eb}
+    body{font-family:ui-sans-serif,system-ui;background:#fff;max-width:760px;margin:40px auto;padding:0 16px}
+    form,.card{border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px;background:#fff}
+    h1{margin-top:0}
+    label{display:block;margin:8px 0 4px}
+    input{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
+    button{padding:10px 16px;border-radius:10px;border:0;background:var(--b);color:#fff;cursor:pointer}
+    .muted{color:#6b7280}
+    pre{white-space:pre-wrap;background:var(--g);padding:12px;border-radius:10px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .error{border-color:#fecaca;background:#fef2f2}
+    .error-text{color:#b91c1c}
+    .right{margin-left:auto}
+  </style>
+</head>
+<body>
+  <h1>🧭 Travel Agent PoC</h1>
+  <p class="muted">Enter a destination and dates; get a concise, structured plan. <em>(No real bookings.)</em></p>
+  <form id="f">
+    <label>Destination <input name="destination" required placeholder="Bangkok, Thailand"/></label>
+    <label>Start <input name="start" type="date" required/></label>
+    <label>End <input name="end" type="date" required/></label>
+    <label>Travelers <input name="travelers" type="number" min="1" value="2"/></label>
+    <label>Budget (USD) <input name="budgetUSD" type="number" value="2000"/></label>
+    <div class="row">
+      <button id="submit" type="submit">Get Suggestion</button>
+      <span id="loading" class="muted" hidden>Loading…</span>
+      <span class="muted right">Disclaimer: generated ideas only — no bookings.</span>
+    </div>
+  </form>
+
+  <div id="err" class="card error" hidden>
+    <strong class="error-text">Something went wrong</strong>
+    <div id="errmsg" class="error-text muted" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="retry">Retry</button>
+    </div>
+  </div>
+
+  <div id="out" class="card" hidden>
+    <h2>Plan</h2>
+    <div id="summary"></div>
+    <h3>Hotel ideas</h3>
+    <ul id="hotels"></ul>
+    <h3>Flight notes</h3>
+    <div id="flight"></div>
+    <h3>Must-do</h3>
+    <ul id="todo"></ul>
+    <hr/>
+    <details>
+      <summary>Raw JSON</summary>
+      <div class="row" style="margin:8px 0">
+        <button id="copy">Copy JSON</button>
+        <span id="copied" class="muted" hidden>Copied!</span>
+      </div>
+      <pre id="raw"></pre>
+    </details>
+  </div>
+
+  <script>
+    const f = document.getElementById('f');
+    const out = (id)=>document.getElementById(id);
+    const setLoading = (isLoading)=>{
+      out('loading').hidden = !isLoading;
+      out('submit').disabled = isLoading;
+    };
+    const showError = (msg, details)=>{
+      out('err').hidden = false;
+      out('errmsg').textContent = msg + (details ? ` — ${details}` : '');
+    };
+    const hideError = ()=>{ out('err').hidden = true; out('errmsg').textContent=''; };
+    out('retry').addEventListener('click', ()=>{ hideError(); out('submit').focus(); });
+    out('copy').addEventListener('click', async ()=>{
+      try { await navigator.clipboard.writeText(out('raw').textContent); out('copied').hidden = false; setTimeout(()=>out('copied').hidden=true, 1200); } catch {}
+    });
+
+    f.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      hideError();
+      const data = Object.fromEntries(new FormData(f).entries());
+      data.travelers = Number(data.travelers||2);
+      data.budgetUSD = Number(data.budgetUSD||2000);
+      setLoading(true);
+      try {
+        const r = await fetch('/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        const j = await r.json();
+        if (!r.ok) {
+          const details = j?.details?.map?.(d=>`${d.field}: ${d.message}`).join(', ');
+          showError(j?.error || 'Request failed', details);
+          return;
+        }
+        out('out').hidden = false;
+        out('summary').textContent = j.plan.summary;
+        out('hotels').innerHTML = (j.plan.hotelIdeas||[]).map(h=>`<li><strong>${h.name}</strong> — ${h.area} (~$${h.estPricePerNightUSD}/night)</li>`).join('');
+        out('flight').textContent = j.plan.flightNotes;
+        out('todo').innerHTML = (j.plan.mustDo||[]).map(x=>`<li>${x}</li>`).join('');
+        out('raw').textContent = JSON.stringify(j,null,2);
+      } catch (e) {
+        showError('Network or server error', e?.message);
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>
