@@ -4,7 +4,7 @@ now:
   - id: ux-polish
     title: "Loading/retry/copy-to-clipboard + disclaimer"
   - id: smoke-tests
-    title: "API smoke tests (happy-path + malformed)"
+    title: "API tests (Vitest + Supertest + smoke)"
   - id: docs
     title: "README screenshots + link ROADMAP"
 next:

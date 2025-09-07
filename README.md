@@ -12,13 +12,18 @@ npm run dev
 # open http://localhost:8787
 ```
 
-## Smoke Tests
+## Tests
 
-Runs a lightweight script with a mocked model response so it works offline.
+- Unit/integration (Vitest + Supertest):
 
 ```bash
-# Optional: no external installs needed
-MOCK_OPENAI=1 npm test
+npm test
+```
+
+- Optional smoke script (offline):
+
+```bash
+npm run smoke
 ```
 
 ## Environment

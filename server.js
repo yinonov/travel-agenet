@@ -154,6 +154,10 @@ app.get('*', (_req, res) => {
 });
 
 const port = Number(process.env.PORT || 8787);
-app.listen(port, () => {
-  console.log(`🧭 Travel PoC: http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`🧭 Travel PoC: http://localhost:${port}`);
+  });
+}
+
+export { app };

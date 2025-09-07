@@ -41,3 +41,4 @@
 
 - 2025‑09‑07: Chose OpenAI Responses API + JSON Schema; no external data for MVP.
 - 2025‑09‑07: Added server-side validation and error JSON (400 with details); introduced `MOCK_OPENAI=1` for offline smoke tests; refined UI with loading, retry, and copy-to-clipboard.
+ - 2025‑09‑07: Added formal tests (Vitest + Supertest) and updated npm scripts; retained optional offline smoke script.
