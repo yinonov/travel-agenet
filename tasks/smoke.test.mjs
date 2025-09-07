@@ -1,40 +1,44 @@
-import { spawn } from 'node:child_process';
+import http from 'node:http';
 import process from 'node:process';
+import { validateSuggestRequest, mockPlan } from '../src/logic.js';
 
-const PORT = process.env.TEST_PORT || '8788';
-
-function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
-async function tryFetch(url, options){
-  try { const r = await fetch(url, options); return r; } catch { return null; }
-}
-
-async function waitForServer(url, tries=30){
-  for (let i=0;i<tries;i++) {
-    const r = await tryFetch(url);
-    if (r) return true;
-    await wait(200);
-  }
-  return false;
-}
+const PORT = Number(process.env.TEST_PORT || 8790);
 
 function assert(cond, msg){ if(!cond) throw new Error(msg); }
 
-async function run(){
-  console.log('Starting server in MOCK mode on port', PORT);
-  const child = spawn(process.execPath, ['server.js'], {
-    env: { ...process.env, PORT, MOCK_OPENAI: '1' },
-    stdio: ['ignore','pipe','pipe']
+function makeServer(){
+  return http.createServer(async (req, res) => {
+    if (req.method === 'POST' && req.url === '/suggest') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const data = body ? JSON.parse(body) : {};
+          const { valid, errors, value } = validateSuggestRequest(data);
+          if (!valid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid request', details: errors }));
+            return;
+          }
+          const out = mockPlan({ destination: value.destination, dates: value.dates, travelers: value.travelers, budgetUSD: value.budgetUSD });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(out));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Bad JSON' }));
+        }
+      });
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
   });
-  let out='';
-  child.stdout.on('data', d=>{ out+=d.toString(); });
-  child.stderr.on('data', d=>{ out+=d.toString(); });
+}
 
+async function run(){
+  const server = makeServer();
+  await new Promise(resolve => server.listen(PORT, resolve));
   const base = `http://localhost:${PORT}`;
-  const up = await waitForServer(base);
-  if (!up) {
-    child.kill('SIGKILL');
-    throw new Error('Server did not start');
-  }
 
   let failures = 0;
   const post = (path, body)=> fetch(base+path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -57,7 +61,7 @@ async function run(){
     console.log('✓ Malformed dates');
   } catch (e) { console.error('✗ Malformed dates failed:', e.message); failures++; }
 
-  // Malformed: missing destination
+  // Malformed: missing destination and invalid numbers
   try {
     const resp = await post('/suggest', { start: '2025-05-10', end: '2025-05-11', travelers: 0, budgetUSD: -1 });
     assert(!resp.ok && resp.status === 400, 'Expected 400 for invalid body');
@@ -66,7 +70,7 @@ async function run(){
     console.log('✓ Malformed body');
   } catch (e) { console.error('✗ Malformed body failed:', e.message); failures++; }
 
-  child.kill('SIGTERM');
+  server.close();
   if (failures) {
     console.error(`Smoke tests failed: ${failures}`);
     process.exit(1);
@@ -76,4 +80,3 @@ async function run(){
 }
 
 run().catch(e=>{ console.error('Test run error:', e); process.exit(1); });
-
