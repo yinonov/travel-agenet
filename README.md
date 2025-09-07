@@ -37,9 +37,7 @@ Use Render Web Service with auto‑deploy on merges to `main`:
 
 Merging to `main` will trigger an auto‑deploy. Render gives a public URL to share.
 
-Deploy your own copy via Render:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/yinonov/travel-agenet)
+ 
 
 ## Environment
 
