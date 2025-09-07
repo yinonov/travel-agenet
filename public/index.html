@@ -64,6 +64,11 @@
     </details>
   </div>
 
+  <div id="hist" class="card" hidden>
+    <h2>Recent Queries</h2>
+    <ul id="histlist"></ul>
+  </div>
+
   <script>
     const f = document.getElementById('f');
     const out = (id)=>document.getElementById(id);
@@ -102,6 +107,17 @@
         out('flight').textContent = j.plan.flightNotes;
         out('todo').innerHTML = (j.plan.mustDo||[]).map(x=>`<li>${x}</li>`).join('');
         out('raw').textContent = JSON.stringify(j,null,2);
+        // Update history panel
+        try {
+          const hr = await fetch('/history');
+          const hist = await hr.json();
+          out('hist').hidden = false;
+          out('histlist').innerHTML = (hist||[]).slice().reverse().map(h=>{
+            const { destination, dates, travelers, budgetUSD } = h.request || {};
+            const sum = h.response?.plan?.summary || '';
+            return `<li><strong>${destination}</strong> — ${dates?.start} → ${dates?.end} • ${travelers} pax • $${budgetUSD}<br/><span class="muted">${sum}</span></li>`;
+          }).join('');
+        } catch {}
       } catch (e) {
         showError('Network or server error', e?.message);
       } finally {

@@ -91,6 +91,16 @@ app.post('/suggest', async (req, res) => {
     // Mock mode for local tests or offline development
     if (process.env.MOCK_OPENAI === '1') {
       const mocked = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD });
+      const entry = {
+        request: { destination, dates: { start, end }, travelers, budgetUSD },
+        response: mocked,
+        at: new Date().toISOString()
+      };
+      if (process.env.NODE_ENV === 'test') {
+        await persistHistory(entry);
+      } else {
+        persistHistory(entry).catch(()=>{});
+      }
       await logMetrics({ latencyMs: Date.now() - started, usage: null, model: 'mock', ok: true });
       return res.json(mocked);
     }
@@ -155,6 +165,17 @@ Return a short plan following the JSON schema.` }
     });
 
     const data = extractJson(resp);
+    const entry = {
+      request: { destination, dates: { start, end }, travelers, budgetUSD },
+      response: data,
+      at: new Date().toISOString()
+    };
+    if (process.env.NODE_ENV === 'test') {
+      await persistHistory(entry);
+    } else {
+      // fire-and-forget history write (not awaited to keep latency low)
+      persistHistory(entry).catch(()=>{});
+    }
     await logMetrics({ latencyMs: Date.now() - started, usage: extractUsage(resp), model: resp?.model || 'responses', ok: true });
     res.json(data);
   } catch (err) {
@@ -171,6 +192,16 @@ Return a short plan following the JSON schema.` }
           response_format: { type: "json_object" }
         });
         const data = JSON.parse(fallback.choices[0].message.content);
+        const entry = {
+          request: { destination, dates: { start, end }, travelers, budgetUSD },
+          response: data,
+          at: new Date().toISOString()
+        };
+        if (process.env.NODE_ENV === 'test') {
+          await persistHistory(entry);
+        } else {
+          persistHistory(entry).catch(()=>{});
+        }
         await logMetrics({ latencyMs: Date.now() - startedFallback, usage: fallback?.usage, model: fallback?.model || 'chat.completions', ok: true });
         return res.json(data);
       } catch (e2) {
@@ -180,6 +211,37 @@ Return a short plan following the JSON schema.` }
     console.error(err);
     await logMetrics({ latencyMs: 0, usage: null, model: 'error', ok: false, error: String(err?.message || err) });
     res.status(400).json({ error: String(err?.message || err) });
+  }
+});
+
+// Persist last 10 queries to data/history.json
+const DATA_DIR = path.join(__dirname, 'data');
+const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+
+async function persistHistory(entry) {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    let arr = [];
+    try {
+      const raw = await fs.readFile(HISTORY_FILE, 'utf8');
+      arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) arr = [];
+    } catch {}
+    arr.push(entry);
+    if (arr.length > 10) arr = arr.slice(arr.length - 10);
+    await fs.writeFile(HISTORY_FILE, JSON.stringify(arr, null, 2));
+  } catch (e) {
+    console.error('persistHistory error:', e?.message || e);
+  }
+}
+
+app.get('/history', async (_req, res) => {
+  try {
+    const raw = await fs.readFile(HISTORY_FILE, 'utf8');
+    const arr = JSON.parse(raw);
+    res.json(Array.isArray(arr) ? arr : []);
+  } catch {
+    res.json([]);
   }
 });
 
