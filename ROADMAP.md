@@ -43,3 +43,4 @@
 - 2025‑09‑07: Added server-side validation and error JSON (400 with details); introduced `MOCK_OPENAI=1` for offline smoke tests; refined UI with loading, retry, and copy-to-clipboard.
  - 2025‑09‑07: Added formal tests (Vitest + Supertest) and updated npm scripts; retained optional offline smoke script.
  - 2025‑09‑07: Chose Render Web Service for deployment; added `render.yaml` blueprint with auto‑deploy on merges to `main`.
+ - 2025‑09‑07: Enabled Render PR previews in `render.yaml` and added a "Deploy to Render" button in README for easy sharing.
