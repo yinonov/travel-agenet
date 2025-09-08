@@ -23,6 +23,11 @@
 <body>
   <h1>🧭 Travel Agent PoC</h1>
   <p class="muted">Enter a destination and dates; get a concise, structured plan. <em>(No real bookings.)</em></p>
+  <label style="display:block;margin:8px 0"><input type="checkbox" id="ambientToggle"/> Show ambient suggestions</label>
+  <div id="ambient" class="card" hidden>
+    <h2>Ambient Suggestions</h2>
+    <ul id="ambientList"></ul>
+  </div>
     <form id="f">
       <label id="fld-destination" hidden>Destination <input name="destination" placeholder="Bangkok, Thailand"/></label>
       <label id="fld-start" hidden>Start <input name="start" type="date"/></label>
@@ -192,6 +197,25 @@
         showError('Network or server error', e?.message);
       } finally {
         setLoading(false);
+      }
+    });
+
+    const ambientToggle = out('ambientToggle');
+    const ambientBox = out('ambient');
+    const ambientList = out('ambientList');
+    ambientToggle.addEventListener('change', async ()=>{
+      if (ambientToggle.checked) {
+        try {
+          const r = await fetch('/suggestions');
+          const j = await r.json();
+          ambientBox.hidden = false;
+          ambientList.innerHTML = (j||[]).map(s=>`<li><strong>${s.destination}</strong> — ${s.plan?.summary||''}</li>`).join('');
+        } catch {
+          ambientBox.hidden = true;
+        }
+      } else {
+        ambientBox.hidden = true;
+        ambientList.innerHTML = '';
       }
     });
   </script>
