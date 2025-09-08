@@ -120,7 +120,10 @@ describe('slider interactions', () => {
       histlist: new Elem(),
       travelersOut: new Elem(),
       budgetOut: new Elem(),
-      estimate: new Elem()
+      estimate: new Elem(),
+      ambientToggle: new Elem(),
+      ambient: new Elem(),
+      ambientList: new Elem()
     };
     ['destination','start','end','travelers','budgetUSD'].forEach(n=>{ const el=new Elem(); form[n]=el; elements[n]=el; });
     global.document = {

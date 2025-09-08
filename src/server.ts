@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import { validateSuggestRequest, mockPlan, SuggestPlan, PlanCore, estimateCost } from './logic.js';
-import { collectContext } from './context.js';
+import { collectContext, readPastQueries } from './context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,6 +100,38 @@ async function persistHistory(entry: any) {
   } catch (e) {
     console.error('persistHistory error:', (e as Error)?.message || e);
   }
+}
+
+// Ambient suggestions scheduler
+const scheduledSuggestions: SuggestPlan[] = [];
+
+async function refreshSuggestions() {
+  try {
+    const past = await readPastQueries();
+    const now = Date.now();
+    const horizon = now + 30 * 86400000; // 30 days
+    scheduledSuggestions.length = 0;
+    for (const q of past) {
+      const start = q?.dates?.start || q?.start;
+      const end = q?.dates?.end || q?.end;
+      if (!start || !end) continue;
+      const s = new Date(start).getTime();
+      if (isNaN(s) || s < now || s > horizon) continue;
+      const plan = mockPlan({
+        destination: q.destination,
+        dates: { start, end },
+        travelers: q.travelers,
+        budgetUSD: q.budgetUSD,
+        preferences: q.preferences || { comfort: 0.33, cost: 0.33, speed: 0.34 }
+      } as PlanCore);
+      scheduledSuggestions.push({ ...plan, reasoning: 'Scheduled suggestion' });
+    }
+  } catch {}
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  refreshSuggestions();
+  setInterval(refreshSuggestions, 3600000);
 }
 
 app.post('/suggest', async (req: Request, res: Response) => {
@@ -238,6 +270,10 @@ app.get('/estimate', (req: Request, res: Response) => {
   res.json(range);
 });
 
+app.get('/suggestions', (_req: Request, res: Response) => {
+  res.json(scheduledSuggestions);
+});
+
 app.get('/history', async (_req: Request, res: Response) => {
   try {
     const raw = await fs.readFile(HISTORY_FILE, 'utf8');
@@ -260,4 +296,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app };
+export { app, refreshSuggestions };
