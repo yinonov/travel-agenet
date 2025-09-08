@@ -8,6 +8,7 @@ Single-node app that serves a tiny UI and a `/suggest` endpoint using OpenAI **S
 cd travel-poc
 cp .env.example .env
 # edit .env and put your OpenAI key
+npm install
 npm run dev
 # open http://localhost:8787
 ```
@@ -33,7 +34,7 @@ Use Render Web Service with auto‑deploy on merges to `main`:
 1) In Render, click New → Blueprint and select this repo. Render will detect `render.yaml`.
 2) Confirm the service; set Environment Variable `OPENAI_API_KEY` (required). Leave `MOCK_OPENAI` unset.
 3) Ensure branch is `main` and Auto Deploy is enabled (render.yaml sets this).
-4) First deploy builds with `npm ci` and runs `npm start`. Render sets `PORT` automatically.
+4) First deploy builds with `npm ci && npm run build` and runs `npm start`. Render sets `PORT` automatically.
 
 Merging to `main` will trigger an auto‑deploy. Render gives a public URL to share.
 
