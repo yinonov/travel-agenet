@@ -1,6 +1,7 @@
 import http from 'node:http';
 import process from 'node:process';
-import { validateSuggestRequest, mockPlan } from '../src/logic.js';
+// Use compiled logic in dist for TS builds
+const { validateSuggestRequest, mockPlan } = await import('../dist/logic.js');
 
 const PORT = Number(process.env.TEST_PORT || 8790);
 
@@ -80,4 +81,3 @@ async function run(){
 }
 
 run().catch(e=>{ console.error('Test run error:', e); process.exit(1); });
-

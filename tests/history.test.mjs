@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 process.env.NODE_ENV = 'test';
 process.env.MOCK_OPENAI = '1';
 
-const { app } = await import('../server.js');
+const { app } = await import('../src/server.ts');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,4 +36,3 @@ describe('History persistence', () => {
     expect(h.body[9]?.request?.destination).toBe('City 11');
   });
 });
-

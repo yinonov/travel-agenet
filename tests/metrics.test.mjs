@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 process.env.NODE_ENV = 'test';
 process.env.MOCK_OPENAI = '1';
 
-const { app } = await import('../server.js');
+const { app } = await import('../src/server.ts');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,4 +32,3 @@ describe('Metrics logging', () => {
     expect(lines[0]).toContain('timestamp,latency_ms');
   });
 });
-

@@ -5,7 +5,7 @@ import request from 'supertest';
 process.env.NODE_ENV = 'test';
 process.env.MOCK_OPENAI = '1';
 
-const { app } = await import('../server.js');
+const { app } = await import('../src/server.ts');
 
 describe('POST /suggest', () => {
   it('returns a structured plan for valid input (happy path)', async () => {
@@ -41,4 +41,3 @@ describe('POST /suggest', () => {
     expect(res.body.error).toBeTruthy();
   });
 });
-

@@ -6,7 +6,7 @@ services:
     branch: main
     autoDeploy: true
     pullRequestPreviewsEnabled: true
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /
     envVars:
