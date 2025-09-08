@@ -139,6 +139,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
   let merged: any = {};
   let contextMeta: any = {};
   let value: any = null;
+  let reasoning = '';
   try {
     const ctx = await collectContext(req);
     merged = { ...ctx.defaults, ...(req.body || {}) };
@@ -148,7 +149,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
 
     const { destination, dates: { start, end }, travelers, budgetUSD, preferences } = value;
     contextMeta = { geo: ctx.geo, language: ctx.language, device: ctx.device };
-    const reasoning = buildReasoning(preferences, contextMeta);
+    reasoning = buildReasoning(preferences, contextMeta);
 
     if (process.env.MOCK_OPENAI === '1') {
       const base = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD, preferences } as PlanCore);
@@ -214,7 +215,11 @@ app.post('/suggest', async (req: Request, res: Response) => {
       strict: true
     } as const;
 
-    const resp = await client.responses.create({
+    // Ensure OpenAI client is available in non-mock mode
+    if (!client) throw new Error('OpenAI client not initialized');
+    const oc = client;
+
+    const resp = await oc.responses.create({
       model: 'gpt-5-mini',
       input: [
         { role: 'system', content: 'You are a practical travel-planning assistant. Be concise, realistic, no bookings.' },
@@ -233,6 +238,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
     if (!res.headersSent) {
       try {
         const startedFallback = Date.now();
+        if (!client) throw new Error('OpenAI client not initialized');
         const fallback = await client.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
