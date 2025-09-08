@@ -58,6 +58,7 @@
   <div id="out" class="card" hidden>
     <h2>Plan</h2>
     <div id="summary"></div>
+    <div id="reasoning" class="muted" style="margin-top:4px"></div>
     <h3>Hotel ideas</h3>
     <ul id="hotels"></ul>
     <h3>Flight notes</h3>
@@ -171,6 +172,7 @@
           }
         out('out').hidden = false;
         out('summary').textContent = j.plan.summary;
+        out('reasoning').textContent = j.reasoning || '';
         out('hotels').innerHTML = (j.plan.hotelIdeas||[]).map(h=>`<li><strong>${h.name}</strong> — ${h.area} (~$${h.estPricePerNightUSD}/night)</li>`).join('');
         out('flight').textContent = j.plan.flightNotes;
         out('todo').innerHTML = (j.plan.mustDo||[]).map(x=>`<li>${x}</li>`).join('');

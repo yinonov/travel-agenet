@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import fs from 'fs/promises';
-import { validateSuggestRequest, mockPlan, SuggestPlan, estimateCost } from './logic.js';
+import { validateSuggestRequest, mockPlan, SuggestPlan, PlanCore, estimateCost } from './logic.js';
 import { collectContext } from './context.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,6 +72,15 @@ function extractUsage(res: any) {
   };
 }
 
+function buildReasoning(
+  prefs: { comfort: number; cost: number; speed: number },
+  ctx: { geo?: string; language?: string; device?: string }
+) {
+  const { comfort, cost, speed } = prefs;
+  const main = cost >= comfort && cost >= speed ? 'cost' : comfort >= speed ? 'comfort' : 'speed';
+  return `Focused on ${main} given preferences (comfort ${comfort}, cost ${cost}, speed ${speed}) and context geo ${ctx.geo || 'unknown'}, language ${ctx.language || 'unknown'}, device ${ctx.device || 'unknown'}`;
+}
+
 // History persistence
 const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, '..', 'data', 'history.json');
 const DATA_DIR = path.dirname(HISTORY_FILE);
@@ -107,9 +116,11 @@ app.post('/suggest', async (req: Request, res: Response) => {
 
     const { destination, dates: { start, end }, travelers, budgetUSD, preferences } = value;
     contextMeta = { geo: ctx.geo, language: ctx.language, device: ctx.device };
+    const reasoning = buildReasoning(preferences, contextMeta);
 
     if (process.env.MOCK_OPENAI === '1') {
-      const mocked = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD, preferences } as any);
+      const base = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD, preferences } as PlanCore);
+      const mocked: SuggestPlan = { ...base, reasoning };
       const entry = { request: value, context: contextMeta, response: mocked, at: new Date().toISOString() };
       if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
       await logMetrics({ latencyMs: Date.now() - started, usage: null, model: 'mock', ok: true });
@@ -181,10 +192,11 @@ app.post('/suggest', async (req: Request, res: Response) => {
     } as any);
 
     const data = extractJson(resp);
-    const entry = { request: value, context: contextMeta, response: data, at: new Date().toISOString() };
+    const full: SuggestPlan = { ...data, reasoning };
+    const entry = { request: value, context: contextMeta, response: full, at: new Date().toISOString() };
     if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
     await logMetrics({ latencyMs: Date.now() - started, usage: extractUsage(resp), model: resp?.model || 'responses', ok: true });
-    res.json(data);
+    res.json(full);
   } catch (err: any) {
     if (!res.headersSent) {
       try {
@@ -198,10 +210,11 @@ app.post('/suggest', async (req: Request, res: Response) => {
           response_format: { type: 'json_object' }
         } as any);
         const data = JSON.parse(fallback.choices[0].message.content || '{}');
-        const entry = { request: value || merged, context: contextMeta, response: data, at: new Date().toISOString() };
+        const full: SuggestPlan = { ...data, reasoning };
+        const entry = { request: value || merged, context: contextMeta, response: full, at: new Date().toISOString() };
         if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
         await logMetrics({ latencyMs: Date.now() - startedFallback, usage: fallback?.usage, model: fallback?.model || 'chat.completions', ok: true });
-        return res.json(data);
+        return res.json(full);
       } catch (e2) {
         console.error('Fallback error:', e2);
       }

@@ -21,6 +21,7 @@ describe('POST /suggest', () => {
     expect(res.body.destination).toBeTruthy();
     expect(res.body.plan.summary).toBeTruthy();
     expect(Array.isArray(res.body.plan.hotelIdeas)).toBe(true);
+    expect(typeof res.body.reasoning).toBe('string');
   });
 
   it('returns 400 for invalid dates', async () => {
@@ -69,6 +70,8 @@ describe('POST /suggest', () => {
     expect(resComfort.status).toBe(200);
     expect(resCost.body.plan.summary.toLowerCase()).toContain('cost');
     expect(resComfort.body.plan.summary.toLowerCase()).toContain('comfort');
+    expect(resCost.body.reasoning.toLowerCase()).toContain('cost');
+    expect(resComfort.body.reasoning.toLowerCase()).toContain('comfort');
     const priceCost = resCost.body.plan.hotelIdeas[0].estPricePerNightUSD;
     const priceComfort = resComfort.body.plan.hotelIdeas[0].estPricePerNightUSD;
     expect(priceComfort).toBeGreaterThan(priceCost);
@@ -108,6 +111,7 @@ describe('slider interactions', () => {
       copied: new Elem(),
       out: new Elem(),
       summary: new Elem(),
+      reasoning: new Elem(),
       hotels: new Elem(),
       flight: new Elem(),
       todo: new Elem(),
