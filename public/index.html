@@ -23,28 +23,28 @@
 <body>
   <h1>🧭 Travel Agent PoC</h1>
   <p class="muted">Enter a destination and dates; get a concise, structured plan. <em>(No real bookings.)</em></p>
-  <form id="f">
-    <label>Destination <input name="destination" required placeholder="Bangkok, Thailand"/></label>
-    <label>Start <input name="start" type="date" required/></label>
-    <label>End <input name="end" type="date" required/></label>
-    <label>Travelers
+    <form id="f">
+      <label id="fld-destination" hidden>Destination <input name="destination" placeholder="Bangkok, Thailand"/></label>
+      <label id="fld-start" hidden>Start <input name="start" type="date"/></label>
+      <label id="fld-end" hidden>End <input name="end" type="date"/></label>
+      <label id="fld-travelers" hidden>Travelers
+        <div class="row">
+          <input name="travelers" type="range" min="1" max="10" value="2"/>
+          <span id="travelersOut">2</span>
+        </div>
+      </label>
+      <label id="fld-budget" hidden>Budget (USD)
+        <div class="row">
+          <input name="budgetUSD" type="range" min="500" max="10000" step="100" value="2000"/>
+          <span id="budgetOut">2000</span>
+        </div>
+      </label>
+      <div id="estimate" class="muted" style="margin:8px 0" hidden></div>
       <div class="row">
-        <input name="travelers" type="range" min="1" max="10" value="2"/>
-        <span id="travelersOut">2</span>
+        <button id="submit" type="submit">Get Suggestion</button>
+        <span id="loading" class="muted" hidden>Loading…</span>
+        <span class="muted right">Disclaimer: generated ideas only — no bookings.</span>
       </div>
-    </label>
-    <label>Budget (USD)
-      <div class="row">
-        <input name="budgetUSD" type="range" min="500" max="10000" step="100" value="2000"/>
-        <span id="budgetOut">2000</span>
-      </div>
-    </label>
-    <div id="estimate" class="muted" style="margin:8px 0"></div>
-    <div class="row">
-      <button id="submit" type="submit">Get Suggestion</button>
-      <span id="loading" class="muted" hidden>Loading…</span>
-      <span class="muted right">Disclaimer: generated ideas only — no bookings.</span>
-    </div>
   </form>
 
   <div id="err" class="card error" hidden>
@@ -82,11 +82,37 @@
 
   <script>
     const f = document.getElementById('f');
-    const out = (id)=>document.getElementById(id);
-    const setLoading = (isLoading)=>{
-      out('loading').hidden = !isLoading;
-      out('submit').disabled = isLoading;
-    };
+      const out = (id)=>document.getElementById(id);
+      const fields = {
+        destination: out('fld-destination'),
+        'dates.start': out('fld-start'),
+        'dates.end': out('fld-end'),
+        travelers: out('fld-travelers'),
+        budgetUSD: out('fld-budget')
+      };
+      const reveal = (name)=>{
+        if (name === 'dates' || name === 'dates.start' || name === 'dates.end') {
+          fields['dates.start'].hidden = false;
+          fields['dates.end'].hidden = false;
+          f.start.required = true;
+          f.end.required = true;
+        } else if (fields[name]) {
+          fields[name].hidden = false;
+          if (f[name]) f[name].required = true;
+        }
+      };
+      const revealFields = (arr)=>{
+        arr.forEach(reveal);
+        const first = arr[0];
+        if (first) {
+          const inp = first.startsWith('dates') ? (first === 'dates.end' ? f.end : f.start) : f[first];
+          inp?.focus();
+        }
+      };
+      const setLoading = (isLoading)=>{
+        out('loading').hidden = !isLoading;
+        out('submit').disabled = isLoading;
+      };
     const showError = (msg, details)=>{
       out('err').hidden = false;
       out('errmsg').textContent = msg + (details ? ` — ${details}` : '');
@@ -97,48 +123,52 @@
       try { await navigator.clipboard.writeText(out('raw').textContent); out('copied').hidden = false; setTimeout(()=>out('copied').hidden=true, 1200); } catch {}
     });
 
-    const tInput = f.travelers;
-    const bInput = f.budgetUSD;
+      const tInput = f.travelers;
+      const bInput = f.budgetUSD;
     const tOut = out('travelersOut');
     const bOut = out('budgetOut');
-    const estOut = out('estimate');
-    const updateSliderOut = ()=>{
-      tOut.textContent = tInput.value;
-      bOut.textContent = bInput.value;
-    };
-    const fetchEstimate = async ()=>{
-      const destination = f.destination.value.trim();
-      const start = f.start.value;
-      const end = f.end.value;
-      const travelers = tInput.value;
-      if (!destination || !start || !end) { estOut.textContent=''; return; }
-      try {
-        const r = await fetch(`/estimate?destination=${encodeURIComponent(destination)}&start=${start}&end=${end}&travelers=${travelers}`);
-        const j = await r.json();
-        if (r.ok) estOut.textContent = `Estimated total: $${j.minUSD}–$${j.maxUSD}`;
-      } catch { estOut.textContent=''; }
-    };
-    const onSlider = ()=>{ updateSliderOut(); fetchEstimate(); };
-    tInput.addEventListener('input', onSlider);
-    bInput.addEventListener('input', onSlider);
-    ['destination','start','end'].forEach(n=>{ f[n].addEventListener('change', fetchEstimate); });
-    updateSliderOut();
+      const estOut = out('estimate');
+      const updateSliderOut = ()=>{
+        tOut.textContent = tInput.value;
+        bOut.textContent = bInput.value;
+      };
+      const fetchEstimate = async ()=>{
+        const destination = f.destination.value.trim();
+        const start = f.start.value;
+        const end = f.end.value;
+        const travelers = tInput.value;
+        if (!destination || !start || !end) { estOut.textContent=''; estOut.hidden=true; return; }
+        try {
+          const r = await fetch(`/estimate?destination=${encodeURIComponent(destination)}&start=${start}&end=${end}&travelers=${travelers}`);
+          const j = await r.json();
+          if (r.ok) { estOut.hidden=false; estOut.textContent = `Estimated total: $${j.minUSD}–$${j.maxUSD}`; }
+        } catch { estOut.textContent=''; estOut.hidden=true; }
+      };
+      const onSlider = ()=>{ updateSliderOut(); fetchEstimate(); };
+      tInput.addEventListener('input', onSlider);
+      bInput.addEventListener('input', onSlider);
+      ['destination','start','end'].forEach(n=>{ f[n].addEventListener('change', fetchEstimate); });
+      updateSliderOut();
 
     f.addEventListener('submit', async (e)=>{
       e.preventDefault();
       hideError();
-      const data = Object.fromEntries(new FormData(f).entries());
-      data.travelers = Number(data.travelers||2);
-      data.budgetUSD = Number(data.budgetUSD||2000);
-      setLoading(true);
-      try {
-        const r = await fetch('/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-        const j = await r.json();
-        if (!r.ok) {
-          const details = j?.details?.map?.(d=>`${d.field}: ${d.message}`).join(', ');
-          showError(j?.error || 'Request failed', details);
-          return;
-        }
+        const data = Object.fromEntries(new FormData(f).entries());
+        data.travelers = Number(data.travelers||2);
+        data.budgetUSD = Number(data.budgetUSD||2000);
+        setLoading(true);
+        try {
+          const r = await fetch('/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+          const j = await r.json();
+          if (!r.ok) {
+            if (Array.isArray(j?.details)) {
+              revealFields(j.details.map(d=>d.field));
+            } else {
+              const details = j?.details?.map?.(d=>`${d.field}: ${d.message}`).join(', ');
+              showError(j?.error || 'Request failed', details);
+            }
+            return;
+          }
         out('out').hidden = false;
         out('summary').textContent = j.plan.summary;
         out('hotels').innerHTML = (j.plan.hotelIdeas||[]).map(h=>`<li><strong>${h.name}</strong> — ${h.area} (~$${h.estPricePerNightUSD}/night)</li>`).join('');
