@@ -5,6 +5,7 @@ export type SuggestRequest = {
   dates?: { start?: string; end?: string };
   travelers: number;
   budgetUSD: number;
+  preferences?: { comfort?: number; cost?: number; speed?: number };
 };
 
 export type SuggestPlan = {
@@ -12,6 +13,7 @@ export type SuggestPlan = {
   dates: { start: string; end: string };
   travelers: number;
   budgetUSD: number;
+  preferences: { comfort: number; cost: number; speed: number };
   plan: {
     summary: string;
     hotelIdeas: { name: string; area: string; estPricePerNightUSD: number }[];
@@ -23,7 +25,10 @@ export type SuggestPlan = {
 export function validateSuggestRequest(body: Partial<SuggestRequest> = {}): {
   valid: boolean;
   errors: { field: string; message: string }[];
-  value: Omit<SuggestRequest, 'start' | 'end' | 'dates'> & { dates: { start: string; end: string } } | null;
+  value: Omit<SuggestRequest, 'start' | 'end' | 'dates' | 'preferences'> & {
+    dates: { start: string; end: string };
+    preferences: { comfort: number; cost: number; speed: number };
+  } | null;
 } {
   const errors: { field: string; message: string }[] = [];
   const out: any = {};
@@ -53,23 +58,59 @@ export function validateSuggestRequest(body: Partial<SuggestRequest> = {}): {
   if (!Number.isFinite(budgetUSD) || budgetUSD <= 0) errors.push({ field: 'budgetUSD', message: 'budgetUSD must be a number > 0' });
   else out.budgetUSD = budgetUSD;
 
+  const defaultPrefs = { comfort: 0.33, cost: 0.33, speed: 0.34 };
+  const prefsIn = body.preferences || {};
+  const parsePref = (name: keyof typeof defaultPrefs) => {
+    const raw = (prefsIn as any)[name];
+    if (raw === undefined) return defaultPrefs[name];
+    const num = Number(raw);
+    if (!Number.isFinite(num) || num < 0 || num > 1) {
+      errors.push({ field: `preferences.${name}`, message: `${name} must be between 0 and 1` });
+      return defaultPrefs[name];
+    }
+    return num;
+  };
+  out.preferences = {
+    comfort: parsePref('comfort'),
+    cost: parsePref('cost'),
+    speed: parsePref('speed')
+  };
+
   return { valid: errors.length === 0, errors, value: errors.length ? null : out };
 }
 
-export function mockPlan({ destination, dates, travelers, budgetUSD }: SuggestPlan): SuggestPlan {
+export function mockPlan({ destination, dates, travelers, budgetUSD, preferences }: SuggestPlan): SuggestPlan {
+  const main = ((): 'comfort' | 'cost' | 'speed' => {
+    const { comfort, cost, speed } = preferences;
+    if (cost >= comfort && cost >= speed) return 'cost';
+    if (comfort >= cost && comfort >= speed) return 'comfort';
+    return 'speed';
+  })();
+
+  const hotelDivisors =
+    main === 'comfort' ? [8, 10, 12] : main === 'cost' ? [12, 14, 16] : [10, 12, 14];
+
+  const flightNotes =
+    main === 'speed'
+      ? 'Aim for direct flights or minimal layovers to save time.'
+      : main === 'comfort'
+      ? 'Consider premium seating or lay-flat options for comfort.'
+      : 'Consider budget airlines and flexible dates to save money.';
+
   return {
     destination,
     dates,
     travelers,
     budgetUSD,
+    preferences,
     plan: {
-      summary: `A short, budget-aware plan for ${destination} (${dates.start}→${dates.end}) for ${travelers}.`,
+      summary: `A ${main}-focused plan for ${destination} (${dates.start}→${dates.end}) for ${travelers}.`,
       hotelIdeas: [
-        { name: 'Central Stay', area: 'Downtown', estPricePerNightUSD: Math.round(budgetUSD / 10) },
-        { name: 'Cozy Corner', area: 'Old Town', estPricePerNightUSD: Math.round(budgetUSD / 12) },
-        { name: 'Transit Hub Inn', area: 'Near Station', estPricePerNightUSD: Math.round(budgetUSD / 14) }
+        { name: 'Central Stay', area: 'Downtown', estPricePerNightUSD: Math.round(budgetUSD / hotelDivisors[0]) },
+        { name: 'Cozy Corner', area: 'Old Town', estPricePerNightUSD: Math.round(budgetUSD / hotelDivisors[1]) },
+        { name: 'Transit Hub Inn', area: 'Near Station', estPricePerNightUSD: Math.round(budgetUSD / hotelDivisors[2]) }
       ],
-      flightNotes: 'Look for morning departures; consider one-stop options to save.',
+      flightNotes,
       mustDo: ['City highlights', 'Local market', 'Neighborhood food tour']
     }
   };

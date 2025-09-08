@@ -43,6 +43,36 @@ describe('POST /suggest', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBeTruthy();
   });
+
+  it('validates preference weights', async () => {
+    const res = await request(app)
+      .post('/suggest')
+      .send({ destination: 'Paris', start: '2025-05-01', end: '2025-05-05', travelers: 1, budgetUSD: 500, preferences: { comfort: -1, cost: 2, speed: 0 } })
+      .set('Content-Type', 'application/json');
+
+    expect(res.status).toBe(400);
+    expect(Array.isArray(res.body.details)).toBe(true);
+  });
+
+  it('reflects preferences in the plan', async () => {
+    const base = { destination: 'Paris', start: '2025-05-01', end: '2025-05-05', travelers: 2, budgetUSD: 1000 };
+    const resCost = await request(app)
+      .post('/suggest')
+      .send({ ...base, preferences: { comfort: 0, cost: 1, speed: 0 } })
+      .set('Content-Type', 'application/json');
+    const resComfort = await request(app)
+      .post('/suggest')
+      .send({ ...base, preferences: { comfort: 1, cost: 0, speed: 0 } })
+      .set('Content-Type', 'application/json');
+
+    expect(resCost.status).toBe(200);
+    expect(resComfort.status).toBe(200);
+    expect(resCost.body.plan.summary.toLowerCase()).toContain('cost');
+    expect(resComfort.body.plan.summary.toLowerCase()).toContain('comfort');
+    const priceCost = resCost.body.plan.hotelIdeas[0].estPricePerNightUSD;
+    const priceComfort = resComfort.body.plan.hotelIdeas[0].estPricePerNightUSD;
+    expect(priceComfort).toBeGreaterThan(priceCost);
+  });
 });
 
 describe('GET /estimate', () => {
