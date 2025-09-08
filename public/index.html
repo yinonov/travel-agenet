@@ -27,8 +27,19 @@
     <label>Destination <input name="destination" required placeholder="Bangkok, Thailand"/></label>
     <label>Start <input name="start" type="date" required/></label>
     <label>End <input name="end" type="date" required/></label>
-    <label>Travelers <input name="travelers" type="number" min="1" value="2"/></label>
-    <label>Budget (USD) <input name="budgetUSD" type="number" value="2000"/></label>
+    <label>Travelers
+      <div class="row">
+        <input name="travelers" type="range" min="1" max="10" value="2"/>
+        <span id="travelersOut">2</span>
+      </div>
+    </label>
+    <label>Budget (USD)
+      <div class="row">
+        <input name="budgetUSD" type="range" min="500" max="10000" step="100" value="2000"/>
+        <span id="budgetOut">2000</span>
+      </div>
+    </label>
+    <div id="estimate" class="muted" style="margin:8px 0"></div>
     <div class="row">
       <button id="submit" type="submit">Get Suggestion</button>
       <span id="loading" class="muted" hidden>Loading…</span>
@@ -85,6 +96,33 @@
     out('copy').addEventListener('click', async ()=>{
       try { await navigator.clipboard.writeText(out('raw').textContent); out('copied').hidden = false; setTimeout(()=>out('copied').hidden=true, 1200); } catch {}
     });
+
+    const tInput = f.travelers;
+    const bInput = f.budgetUSD;
+    const tOut = out('travelersOut');
+    const bOut = out('budgetOut');
+    const estOut = out('estimate');
+    const updateSliderOut = ()=>{
+      tOut.textContent = tInput.value;
+      bOut.textContent = bInput.value;
+    };
+    const fetchEstimate = async ()=>{
+      const destination = f.destination.value.trim();
+      const start = f.start.value;
+      const end = f.end.value;
+      const travelers = tInput.value;
+      if (!destination || !start || !end) { estOut.textContent=''; return; }
+      try {
+        const r = await fetch(`/estimate?destination=${encodeURIComponent(destination)}&start=${start}&end=${end}&travelers=${travelers}`);
+        const j = await r.json();
+        if (r.ok) estOut.textContent = `Estimated total: $${j.minUSD}–$${j.maxUSD}`;
+      } catch { estOut.textContent=''; }
+    };
+    const onSlider = ()=>{ updateSliderOut(); fetchEstimate(); };
+    tInput.addEventListener('input', onSlider);
+    bInput.addEventListener('input', onSlider);
+    ['destination','start','end'].forEach(n=>{ f[n].addEventListener('change', fetchEstimate); });
+    updateSliderOut();
 
     f.addEventListener('submit', async (e)=>{
       e.preventDefault();

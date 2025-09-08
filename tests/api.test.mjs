@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Ensure server runs in test mode and uses mock openai
 process.env.NODE_ENV = 'test';
@@ -39,5 +42,71 @@ describe('POST /suggest', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeTruthy();
+  });
+});
+
+describe('GET /estimate', () => {
+  it('returns an estimated range', async () => {
+    const res = await request(app)
+      .get('/estimate')
+      .query({ destination: 'Paris', start: '2025-06-01', end: '2025-06-05', travelers: 2 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400 });
+  });
+});
+
+describe('slider interactions', () => {
+  it('fetches estimates as sliders move', async () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const html = await fs.readFile(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+    const script = html.match(/<script>([\s\S]*)<\/script>/i)[1];
+    class Elem {
+      constructor(){ this.value=''; this.textContent=''; this.hidden=false; this.disabled=false; this.listeners={}; }
+      addEventListener(t, cb){ (this.listeners[t] ||= []).push(cb); }
+      dispatchEvent(evt){ (this.listeners[evt.type]||[]).forEach(fn=>fn(evt)); }
+    }
+    const form = new Elem();
+    const elements = {
+      f: form,
+      loading: new Elem(),
+      submit: new Elem(),
+      err: new Elem(),
+      errmsg: new Elem(),
+      retry: new Elem(),
+      copy: new Elem(),
+      copied: new Elem(),
+      out: new Elem(),
+      summary: new Elem(),
+      hotels: new Elem(),
+      flight: new Elem(),
+      todo: new Elem(),
+      raw: new Elem(),
+      hist: new Elem(),
+      histlist: new Elem(),
+      travelersOut: new Elem(),
+      budgetOut: new Elem(),
+      estimate: new Elem()
+    };
+    ['destination','start','end','travelers','budgetUSD'].forEach(n=>{ const el=new Elem(); form[n]=el; elements[n]=el; });
+    global.document = {
+      getElementById:id=>elements[id],
+      querySelector:sel=>{ const m=sel.match(/input\[name="(.+)"\]/); return m?form[m[1]]:null; }
+    };
+    global.FormData = class { constructor(){ return { entries: ()=>[] }; } };
+    global.navigator = { clipboard: { writeText: async()=>{} } };
+    global.Event = class { constructor(type){ this.type=type; } };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ minUSD: 100, maxUSD: 200 }) });
+    global.fetch = fetchMock;
+    eval(script);
+    form.destination.value = 'Bangkok';
+    form.start.value = '2025-01-01';
+    form.end.value = '2025-01-03';
+    form.travelers.value = '3';
+    form.travelers.dispatchEvent(new Event('input'));
+    await new Promise(r=>setTimeout(r,0));
+    expect(fetchMock).toHaveBeenCalled();
+    expect(elements.estimate.textContent).toContain('$100');
+    expect(elements.estimate.textContent).toContain('$200');
   });
 });
