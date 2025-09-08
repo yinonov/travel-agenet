@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import { validateSuggestRequest, mockPlan, SuggestPlan } from './logic.js';
+import { collectContext } from './context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,7 @@ app.use(express.json());
 // Serve static UI
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = process.env.MOCK_OPENAI === '1' ? null : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Metrics: latency and token usage (CSV file)
 const LOGS_DIR = path.join(__dirname, '..', 'logs');
@@ -72,8 +73,8 @@ function extractUsage(res: any) {
 }
 
 // History persistence
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, '..', 'data', 'history.json');
+const DATA_DIR = path.dirname(HISTORY_FILE);
 
 async function persistHistory(entry: any) {
   try {
@@ -93,16 +94,23 @@ async function persistHistory(entry: any) {
 }
 
 app.post('/suggest', async (req: Request, res: Response) => {
+  const started = Date.now();
+  let merged: any = {};
+  let contextMeta: any = {};
+  let value: any = null;
   try {
-    const started = Date.now();
-    const { valid, errors, value } = validateSuggestRequest(req.body || {});
-    if (!valid || !value) return res.status(400).json({ error: 'Invalid request', details: errors });
+    const ctx = await collectContext(req);
+    merged = { ...ctx.defaults, ...(req.body || {}) };
+    const validation = validateSuggestRequest(merged);
+    value = validation.value;
+    if (!validation.valid || !value) return res.status(400).json({ error: 'Invalid request', details: validation.errors });
 
     const { destination, dates: { start, end }, travelers, budgetUSD } = value;
+    contextMeta = { geo: ctx.geo, language: ctx.language, device: ctx.device };
 
     if (process.env.MOCK_OPENAI === '1') {
       const mocked = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD } as any);
-      const entry = { request: { destination, dates: { start, end }, travelers, budgetUSD }, response: mocked, at: new Date().toISOString() };
+      const entry = { request: value, context: contextMeta, response: mocked, at: new Date().toISOString() };
       if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
       await logMetrics({ latencyMs: Date.now() - started, usage: null, model: 'mock', ok: true });
       return res.json(mocked);
@@ -163,7 +171,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
     } as any);
 
     const data = extractJson(resp);
-    const entry = { request: { destination, dates: { start, end }, travelers, budgetUSD }, response: data, at: new Date().toISOString() };
+    const entry = { request: value, context: contextMeta, response: data, at: new Date().toISOString() };
     if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
     await logMetrics({ latencyMs: Date.now() - started, usage: extractUsage(resp), model: resp?.model || 'responses', ok: true });
     res.json(data);
@@ -180,7 +188,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
           response_format: { type: 'json_object' }
         } as any);
         const data = JSON.parse(fallback.choices[0].message.content || '{}');
-        const entry = { request: req.body, response: data, at: new Date().toISOString() };
+        const entry = { request: value || merged, context: contextMeta, response: data, at: new Date().toISOString() };
         if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
         await logMetrics({ latencyMs: Date.now() - startedFallback, usage: fallback?.usage, model: fallback?.model || 'chat.completions', ok: true });
         return res.json(data);
