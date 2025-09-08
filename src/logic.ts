@@ -8,12 +8,16 @@ export type SuggestRequest = {
   preferences?: { comfort?: number; cost?: number; speed?: number };
 };
 
-export type SuggestPlan = {
+export type PlanCore = {
   destination: string;
   dates: { start: string; end: string };
   travelers: number;
   budgetUSD: number;
   preferences: { comfort: number; cost: number; speed: number };
+};
+
+export type SuggestPlan = PlanCore & {
+  reasoning: string;
   plan: {
     summary: string;
     hotelIdeas: { name: string; area: string; estPricePerNightUSD: number }[];
@@ -79,7 +83,14 @@ export function validateSuggestRequest(body: Partial<SuggestRequest> = {}): {
   return { valid: errors.length === 0, errors, value: errors.length ? null : out };
 }
 
-export function mockPlan({ destination, dates, travelers, budgetUSD, preferences }: SuggestPlan): SuggestPlan {
+export function mockPlan({ destination, dates, travelers, budgetUSD, preferences }: PlanCore): PlanCore & {
+  plan: {
+    summary: string;
+    hotelIdeas: { name: string; area: string; estPricePerNightUSD: number }[];
+    flightNotes: string;
+    mustDo: string[];
+  };
+} {
   const main = ((): 'comfort' | 'cost' | 'speed' => {
     const { comfort, cost, speed } = preferences;
     if (cost >= comfort && cost >= speed) return 'cost';
