@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import fs from 'fs/promises';
-import { validateSuggestRequest, mockPlan, SuggestPlan } from './logic.js';
+import { validateSuggestRequest, mockPlan, SuggestPlan, estimateCost } from './logic.js';
 import { collectContext } from './context.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -200,6 +200,19 @@ app.post('/suggest', async (req: Request, res: Response) => {
     await logMetrics({ latencyMs: 0, usage: null, model: 'error', ok: false, error: String(err?.message || err) });
     res.status(400).json({ error: String(err?.message || err) });
   }
+});
+
+app.get('/estimate', (req: Request, res: Response) => {
+  const { destination = '', start, end, travelers } = req.query as Record<string, string>;
+  const t = Number(travelers);
+  const s = new Date(String(start));
+  const e = new Date(String(end));
+  if (!destination || !start || !end || !Number.isFinite(t) || t < 1 || isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) {
+    return res.status(400).json({ error: 'Invalid query' });
+  }
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
+  const range = estimateCost(String(destination), t, days);
+  res.json(range);
 });
 
 app.get('/history', async (_req: Request, res: Response) => {
