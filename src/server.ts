@@ -105,11 +105,11 @@ app.post('/suggest', async (req: Request, res: Response) => {
     value = validation.value;
     if (!validation.valid || !value) return res.status(400).json({ error: 'Invalid request', details: validation.errors });
 
-    const { destination, dates: { start, end }, travelers, budgetUSD } = value;
+    const { destination, dates: { start, end }, travelers, budgetUSD, preferences } = value;
     contextMeta = { geo: ctx.geo, language: ctx.language, device: ctx.device };
 
     if (process.env.MOCK_OPENAI === '1') {
-      const mocked = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD } as any);
+      const mocked = mockPlan({ destination, dates: { start, end }, travelers, budgetUSD, preferences } as any);
       const entry = { request: value, context: contextMeta, response: mocked, at: new Date().toISOString() };
       if (process.env.NODE_ENV === 'test') await persistHistory(entry); else persistHistory(entry).catch(()=>{});
       await logMetrics({ latencyMs: Date.now() - started, usage: null, model: 'mock', ok: true });
@@ -131,6 +131,16 @@ app.post('/suggest', async (req: Request, res: Response) => {
           },
           travelers: { type: 'integer' },
           budgetUSD: { type: 'integer' },
+          preferences: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              comfort: { type: 'number' },
+              cost: { type: 'number' },
+              speed: { type: 'number' }
+            },
+            required: ['comfort','cost','speed']
+          },
           plan: {
             type: 'object',
             additionalProperties: false,
@@ -156,7 +166,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
             required: ['summary','hotelIdeas','flightNotes','mustDo']
           }
         },
-        required: ['destination','dates','travelers','budgetUSD','plan']
+        required: ['destination','dates','travelers','budgetUSD','preferences','plan']
       },
       strict: true
     } as const;
@@ -165,7 +175,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
       model: 'gpt-5-mini',
       input: [
         { role: 'system', content: 'You are a practical travel-planning assistant. Be concise, realistic, no bookings.' },
-        { role: 'user', content: `Destination: ${destination}\nDates: ${start} to ${end}\nTravelers: ${travelers}\nBudgetUSD: ${budgetUSD}\nReturn a short plan following the JSON schema.` }
+        { role: 'user', content: `Destination: ${destination}\nDates: ${start} to ${end}\nTravelers: ${travelers}\nBudgetUSD: ${budgetUSD}\nPreferences: comfort ${preferences.comfort}, cost ${preferences.cost}, speed ${preferences.speed}\nReturn a short plan following the JSON schema.` }
       ],
       response_format: { type: 'json_schema', json_schema: schema as any }
     } as any);
@@ -183,7 +193,7 @@ app.post('/suggest', async (req: Request, res: Response) => {
           model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: 'You are a practical travel-planning assistant. Be concise, realistic, no bookings.' },
-            { role: 'user', content: 'Return STRICT JSON only. Keys: destination, dates{start,end}, travelers, budgetUSD, plan{summary,hotelIdeas[{name,area,estPricePerNightUSD}],flightNotes,mustDo[]}. ' }
+            { role: 'user', content: 'Return STRICT JSON only. Keys: destination, dates{start,end}, travelers, budgetUSD, preferences{comfort,cost,speed}, plan{summary,hotelIdeas[{name,area,estPricePerNightUSD}],flightNotes,mustDo[]}. ' }
           ],
           response_format: { type: 'json_object' }
         } as any);
