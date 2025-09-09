@@ -151,13 +151,13 @@
     };
     const fetchPgEstimate = async ()=>{
       const destination = pg.destination.value.trim();
-      if (!destination) { pg.estimate.textContent=''; return; }
+      if (!destination) { pg.estimate.innerHTML=''; return; }
       try {
         const r = await fetch(`/estimate?destination=${encodeURIComponent(destination)}&days=${pg.days.value}&travelers=${pg.travelers.value}`);
         const j = await r.json();
-        if (r.ok) pg.estimate.textContent = `Estimated total: $${j.minUSD}–$${j.maxUSD}`;
-      } catch { pg.estimate.textContent=''; }
-    };
+        if (r.ok) pg.estimate.innerHTML = `Estimated total: $${j.minUSD}–$${j.maxUSD}<ul><li>Flights: $${j.flightUSD}</li><li>Hotels: $${j.hotelUSD}</li></ul>`;
+      } catch { pg.estimate.innerHTML=''; }
+      };
     const onPgInput = ()=>{ updatePgOut(); fetchPgEstimate(); };
     pg.travelers.addEventListener('input', onPgInput);
     pg.days.addEventListener('input', onPgInput);
@@ -218,12 +218,12 @@
         const start = f.start.value;
         const end = f.end.value;
         const travelers = tInput.value;
-        if (!destination || !start || !end) { estOut.textContent=''; estOut.hidden=true; return; }
+        if (!destination || !start || !end) { estOut.innerHTML=''; estOut.hidden=true; return; }
         try {
           const r = await fetch(`/estimate?destination=${encodeURIComponent(destination)}&start=${start}&end=${end}&travelers=${travelers}`);
           const j = await r.json();
-          if (r.ok) { estOut.hidden=false; estOut.textContent = `Estimated total: $${j.minUSD}–$${j.maxUSD}`; }
-        } catch { estOut.textContent=''; estOut.hidden=true; }
+          if (r.ok) { estOut.hidden=false; estOut.innerHTML = `Estimated total: $${j.minUSD}–$${j.maxUSD}<ul><li>Flights: $${j.flightUSD}</li><li>Hotels: $${j.hotelUSD}</li></ul>`; }
+        } catch { estOut.innerHTML=''; estOut.hidden=true; }
       };
       const onSlider = ()=>{ updateSliderOut(); fetchEstimate(); };
       tInput.addEventListener('input', onSlider);
