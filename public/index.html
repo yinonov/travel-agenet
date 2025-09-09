@@ -28,7 +28,29 @@
     <h2>Ambient Suggestions</h2>
     <ul id="ambientList"></ul>
   </div>
-    <form id="f">
+
+  <div id="pg" class="card">
+    <h2>Playground</h2>
+    <label>Destination <input id="pgDestination" placeholder="Bangkok, Thailand"/></label>
+    <label>Travelers
+      <div class="row">
+        <input id="pgTravelers" type="range" min="1" max="10" value="2"/>
+        <span id="pgTravelersOut">2</span>
+      </div>
+    </label>
+    <label>Length (days)
+      <div class="row">
+        <input id="pgDays" type="range" min="1" max="30" value="3"/>
+        <span id="pgDaysOut">3</span>
+      </div>
+    </label>
+    <div id="pgEstimate" class="muted" style="margin:8px 0"></div>
+    <div class="row">
+      <button id="refine" type="button">Refine my trip</button>
+    </div>
+  </div>
+
+    <form id="f" hidden>
       <label id="fld-destination" hidden>Destination <input name="destination" placeholder="Bangkok, Thailand"/></label>
       <label id="fld-start" hidden>Start <input name="start" type="date"/></label>
       <label id="fld-end" hidden>End <input name="end" type="date"/></label>
@@ -89,6 +111,38 @@
   <script>
     const f = document.getElementById('f');
       const out = (id)=>document.getElementById(id);
+
+    // Playground elements
+    const pg = {
+      card: out('pg'),
+      destination: out('pgDestination'),
+      travelers: out('pgTravelers'),
+      days: out('pgDays'),
+      travelersOut: out('pgTravelersOut'),
+      daysOut: out('pgDaysOut'),
+      estimate: out('pgEstimate'),
+      refine: out('refine')
+    };
+
+    const updatePgOut = ()=>{
+      pg.travelersOut.textContent = pg.travelers.value;
+      pg.daysOut.textContent = pg.days.value;
+    };
+    const fetchPgEstimate = async ()=>{
+      const destination = pg.destination.value.trim();
+      if (!destination) { pg.estimate.textContent=''; return; }
+      try {
+        const r = await fetch(`/estimate?destination=${encodeURIComponent(destination)}&days=${pg.days.value}&travelers=${pg.travelers.value}`);
+        const j = await r.json();
+        if (r.ok) pg.estimate.textContent = `Estimated total: $${j.minUSD}–$${j.maxUSD}`;
+      } catch { pg.estimate.textContent=''; }
+    };
+    const onPgInput = ()=>{ updatePgOut(); fetchPgEstimate(); };
+    pg.travelers.addEventListener('input', onPgInput);
+    pg.days.addEventListener('input', onPgInput);
+    pg.destination.addEventListener('change', fetchPgEstimate);
+    updatePgOut();
+
       const fields = {
         destination: out('fld-destination'),
         'dates.start': out('fld-start'),
@@ -155,6 +209,15 @@
       bInput.addEventListener('input', onSlider);
       ['destination','start','end'].forEach(n=>{ f[n].addEventListener('change', fetchEstimate); });
       updateSliderOut();
+
+    pg.refine.addEventListener('click', ()=>{
+      f.hidden = false;
+      pg.card.hidden = true;
+      revealFields(['destination','dates.start','dates.end','travelers','budgetUSD']);
+      f.destination.value = pg.destination.value;
+      f.travelers.value = pg.travelers.value;
+      updateSliderOut();
+    });
 
     f.addEventListener('submit', async (e)=>{
       e.preventDefault();
