@@ -79,17 +79,25 @@ describe('POST /suggest', () => {
 });
 
 describe('GET /estimate', () => {
-  it('returns an estimated range', async () => {
+  it('returns an estimated range with days', async () => {
     const res = await request(app)
       .get('/estimate')
-      .query({ destination: 'Paris', start: '2025-06-01', end: '2025-06-05', travelers: 2 });
+      .query({ destination: 'Paris', days: 5, travelers: 2 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400 });
+  });
+
+  it('accepts lengthDays alias', async () => {
+    const res = await request(app)
+      .get('/estimate')
+      .query({ destination: 'Paris', lengthDays: 5, travelers: 2 });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400 });
   });
 });
 
 describe('slider interactions', () => {
-  it('fetches estimates as sliders move', async () => {
+  it('fetches estimates in playground as sliders move', async () => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const html = await fs.readFile(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
@@ -123,7 +131,15 @@ describe('slider interactions', () => {
       estimate: new Elem(),
       ambientToggle: new Elem(),
       ambient: new Elem(),
-      ambientList: new Elem()
+      ambientList: new Elem(),
+      pg: new Elem(),
+      pgDestination: new Elem(),
+      pgTravelers: new Elem(),
+      pgDays: new Elem(),
+      pgTravelersOut: new Elem(),
+      pgDaysOut: new Elem(),
+      pgEstimate: new Elem(),
+      refine: new Elem()
     };
     ['destination','start','end','travelers','budgetUSD'].forEach(n=>{ const el=new Elem(); form[n]=el; elements[n]=el; });
     global.document = {
@@ -136,14 +152,13 @@ describe('slider interactions', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ minUSD: 100, maxUSD: 200 }) });
     global.fetch = fetchMock;
     eval(script);
-    form.destination.value = 'Bangkok';
-    form.start.value = '2025-01-01';
-    form.end.value = '2025-01-03';
-    form.travelers.value = '3';
-    form.travelers.dispatchEvent(new Event('input'));
+    elements.pgDestination.value = 'Bangkok';
+    elements.pgDays.value = '3';
+    elements.pgTravelers.value = '2';
+    elements.pgDays.dispatchEvent(new Event('input'));
     await new Promise(r=>setTimeout(r,0));
     expect(fetchMock).toHaveBeenCalled();
-    expect(elements.estimate.textContent).toContain('$100');
-    expect(elements.estimate.textContent).toContain('$200');
+    expect(elements.pgEstimate.textContent).toContain('$100');
+    expect(elements.pgEstimate.textContent).toContain('$200');
   });
 });

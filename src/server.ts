@@ -264,15 +264,26 @@ app.post('/suggest', async (req: Request, res: Response) => {
 });
 
 app.get('/estimate', (req: Request, res: Response) => {
-  const { destination = '', start, end, travelers } = req.query as Record<string, string>;
+  const { destination = '', start, end, travelers, days, lengthDays } = req.query as Record<string, string>;
   const t = Number(travelers);
-  const s = new Date(String(start));
-  const e = new Date(String(end));
-  if (!destination || !start || !end || !Number.isFinite(t) || t < 1 || isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) {
+  if (!destination || !Number.isFinite(t) || t < 1) {
     return res.status(400).json({ error: 'Invalid query' });
   }
-  const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
-  const range = estimateCost(String(destination), t, days);
+
+  let d: number | null = null;
+  if (days !== undefined) d = Number(days);
+  else if (lengthDays !== undefined) d = Number(lengthDays);
+  if (d !== null) {
+    if (!Number.isFinite(d) || d < 1) return res.status(400).json({ error: 'Invalid query' });
+  } else {
+    const s = new Date(String(start));
+    const e = new Date(String(end));
+    if (!start || !end || isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) {
+      return res.status(400).json({ error: 'Invalid query' });
+    }
+    d = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
+  }
+  const range = estimateCost(String(destination), t, d);
   res.json(range);
 });
 

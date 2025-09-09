@@ -132,7 +132,8 @@ export function estimateCost(destination: string, travelers: number, days: numbe
   let base = 100;
   if (/paris|london|new york/.test(dest)) base = 200;
   else if (/bangkok|thailand|vietnam/.test(dest)) base = 50;
-  const total = base * Math.max(days, 1) * Math.max(travelers, 1);
+  const d = Math.max(Math.round(days), 1);
+  const total = base * d * Math.max(travelers, 1);
   return { minUSD: Math.round(total * 0.8), maxUSD: Math.round(total * 1.2) };
 }
 

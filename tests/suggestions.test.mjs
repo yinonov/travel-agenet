@@ -72,6 +72,14 @@ describe('scheduled suggestions', () => {
       ambientToggle: new Elem(),
       ambient: new Elem(),
       ambientList: new Elem(),
+      pg: new Elem(),
+      pgDestination: new Elem(),
+      pgTravelers: new Elem(),
+      pgDays: new Elem(),
+      pgTravelersOut: new Elem(),
+      pgDaysOut: new Elem(),
+      pgEstimate: new Elem(),
+      refine: new Elem(),
     };
     ['destination','start','end','travelers','budgetUSD'].forEach(n=>{ const el=new Elem(); form[n]=el; elements[n]=el; });
     global.document = {
