@@ -3,6 +3,7 @@ import request from 'supertest';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import vm from 'vm';
 
 process.env.NODE_ENV = 'test';
 process.env.MOCK_OPENAI = '1';
@@ -48,5 +49,43 @@ beforeEach(async ()=>{ await resetHistory(); });
       h = await request(app).get('/history');
       expect(h.body.length).toBe(1);
       expect(h.body[0]?.request?.destination).toBe('City');
+    });
+  });
+
+  describe('Scenario persistence', () => {
+    it('persists saved scenarios across sessions', async () => {
+      const html = await fs.readFile(path.join(ROOT, 'public', 'index.html'), 'utf8');
+      const scriptMatch = html.match(/<script>([\s\S]*)<\/script>/);
+      const script = scriptMatch ? scriptMatch[1] : '';
+      const extract = (name)=>{
+        const start = script.indexOf(`function ${name}`);
+        if (start === -1) return '';
+        let i = script.indexOf('{', start);
+        let depth = 1;
+        i++;
+        while (i < script.length && depth > 0) {
+          if (script[i] === '{') depth++;
+          else if (script[i] === '}') depth--;
+          i++;
+        }
+        return script.slice(start, i);
+      };
+      const loadSrc = extract('loadScenarios');
+      const saveSrc = extract('saveScenario');
+      const store = {};
+      const localStorage = {
+        getItem: (k)=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,
+        setItem: (k,v)=>{store[k]=String(v);},
+        removeItem: (k)=>{delete store[k];}
+      };
+      const ctx1 = { localStorage, console };
+      vm.createContext(ctx1);
+      vm.runInContext(loadSrc + saveSrc, ctx1);
+      ctx1.saveScenario('trip', { destination: 'Paris' });
+      const ctx2 = { localStorage, console };
+      vm.createContext(ctx2);
+      vm.runInContext(loadSrc, ctx2);
+      const scenarios = ctx2.loadScenarios();
+      expect(scenarios.some(s=>s.name==='trip' && s.data.destination==='Paris')).toBe(true);
     });
   });
