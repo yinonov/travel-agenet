@@ -84,7 +84,7 @@ describe('GET /estimate', () => {
       .get('/estimate')
       .query({ destination: 'Paris', days: 5, travelers: 2 });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400 });
+    expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400, hotelUSD: 1200, flightUSD: 800 });
   });
 
   it('accepts lengthDays alias', async () => {
@@ -92,7 +92,7 @@ describe('GET /estimate', () => {
       .get('/estimate')
       .query({ destination: 'Paris', lengthDays: 5, travelers: 2 });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400 });
+    expect(res.body).toEqual({ minUSD: 1600, maxUSD: 2400, hotelUSD: 1200, flightUSD: 800 });
   });
 });
 
@@ -104,6 +104,8 @@ describe('slider interactions', () => {
     const script = html.match(/<script>([\s\S]*)<\/script>/i)[1];
     class Elem {
       constructor(){ this.value=''; this.textContent=''; this.hidden=false; this.disabled=false; this.listeners={}; }
+      set innerHTML(v){ this.textContent = v; }
+      get innerHTML(){ return this.textContent; }
       addEventListener(t, cb){ (this.listeners[t] ||= []).push(cb); }
       dispatchEvent(evt){ (this.listeners[evt.type]||[]).forEach(fn=>fn(evt)); }
     }
@@ -149,7 +151,7 @@ describe('slider interactions', () => {
     global.FormData = class { constructor(){ return { entries: ()=>[] }; } };
     global.navigator = { clipboard: { writeText: async()=>{} } };
     global.Event = class { constructor(type){ this.type=type; } };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ minUSD: 100, maxUSD: 200 }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ minUSD: 100, maxUSD: 200, flightUSD: 120, hotelUSD: 80 }) });
     global.fetch = fetchMock;
     eval(script);
     elements.pgDestination.value = 'Bangkok';
@@ -160,5 +162,7 @@ describe('slider interactions', () => {
     expect(fetchMock).toHaveBeenCalled();
     expect(elements.pgEstimate.textContent).toContain('$100');
     expect(elements.pgEstimate.textContent).toContain('$200');
+    expect(elements.pgEstimate.textContent).toContain('$120');
+    expect(elements.pgEstimate.textContent).toContain('$80');
   });
 });

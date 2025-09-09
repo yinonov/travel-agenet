@@ -283,8 +283,8 @@ app.get('/estimate', (req: Request, res: Response) => {
     }
     d = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
   }
-  const range = estimateCost(String(destination), t, d);
-  res.json(range);
+  const breakdown = estimateCost(String(destination), t, d);
+  res.json(breakdown);
 });
 
 app.get('/suggestions', (_req: Request, res: Response) => {
