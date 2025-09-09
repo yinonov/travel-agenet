@@ -58,9 +58,18 @@
       <button type="button" class="chip" data-profile="comfort">Comfort</button>
       <button type="button" class="chip" data-profile="speed">Speed</button>
     </div>
-    <div class="row">
+  <div class="row">
       <button id="refine" type="button">Refine my trip</button>
     </div>
+  </div>
+
+  <div id="scenarios" class="card" hidden>
+    <h2>Scenarios</h2>
+    <div class="row" style="margin-bottom:8px">
+      <input id="scenarioName" type="text" placeholder="Scenario name"/>
+      <button id="saveScenarioBtn" type="button">Save</button>
+    </div>
+    <ul id="scenarioList"></ul>
   </div>
 
     <form id="f" hidden>
@@ -123,7 +132,19 @@
 
   <script>
     const f = document.getElementById('f');
-      const out = (id)=>document.getElementById(id);
+    const out = (id)=>document.getElementById(id);
+    const isSandbox = typeof location !== 'undefined' && /sandbox=1/.test(location.search);
+
+    function loadScenarios(){
+      try { return JSON.parse(localStorage.getItem('scenarios')||'[]'); } catch { return []; }
+    }
+
+    function saveScenario(name,data){
+      if (!name) return;
+      const list = loadScenarios().filter(s=>s.name!==name);
+      list.push({ name, data });
+      localStorage.setItem('scenarios', JSON.stringify(list));
+    }
 
     // Playground elements
     const pg = {
@@ -187,6 +208,47 @@
     pg.days.addEventListener('input', onPgInput);
     pg.destination.addEventListener('change', fetchPgEstimate);
     updatePgOut();
+
+    const scenarioBox = out('scenarios');
+    const scenarioName = out('scenarioName');
+    const scenarioList = out('scenarioList');
+    const saveScenarioBtn = out('saveScenarioBtn');
+
+    const renderScenarios = ()=>{
+      const list = loadScenarios();
+      scenarioList.innerHTML = list.map(s=>`<li><button type="button" data-name="${s.name}">${s.name}</button></li>`).join('');
+      scenarioList.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+        const sc = loadScenarios().find(x=>x.name===btn.dataset.name);
+        if (!sc) return;
+        pg.destination.value = sc.data.destination || '';
+        pg.travelers.value = sc.data.travelers || '1';
+        pg.days.value = sc.data.days || '1';
+        currentPrefs = sc.data.preferences || profiles.balanced;
+        selectedProfile = null;
+        chips.forEach(c=>c.classList.remove('selected'));
+        updatePgOut();
+        fetchPgEstimate();
+      }));
+    };
+
+    if (isSandbox) {
+      scenarioBox.hidden = false;
+      renderScenarios();
+    }
+
+    saveScenarioBtn?.addEventListener('click',()=>{
+      const name = scenarioName.value.trim();
+      if (!name) return;
+      const data = {
+        destination: pg.destination.value,
+        travelers: pg.travelers.value,
+        days: pg.days.value,
+        preferences: currentPrefs
+      };
+      saveScenario(name, data);
+      scenarioName.value='';
+      renderScenarios();
+    });
 
       const fields = {
         destination: out('fld-destination'),
