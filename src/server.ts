@@ -291,6 +291,15 @@ app.get('/suggestions', (_req: Request, res: Response) => {
   res.json(scheduledSuggestions);
 });
 
+app.get('/context', async (req: Request, res: Response) => {
+  try {
+    const ctx = await collectContext(req);
+    res.json(ctx);
+  } catch {
+    res.json({ defaults: {} });
+  }
+});
+
 app.get('/history', async (_req: Request, res: Response) => {
   try {
     const raw = await fs.readFile(HISTORY_FILE, 'utf8');

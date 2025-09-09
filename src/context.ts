@@ -33,6 +33,18 @@ export function inferDeviceHints(req: Request): string | null {
   return (req.headers['user-agent'] as string) || null;
 }
 
+export function defaultTravelers(past: any[], geo?: string | null): number {
+  const last = past[past.length - 1];
+  if (typeof last?.travelers === 'number' && last.travelers > 0) return last.travelers;
+  return geo && /^us/i.test(geo) ? 2 : 1;
+}
+
+export function defaultBudgetUSD(past: any[], geo?: string | null): number {
+  const last = past[past.length - 1];
+  if (typeof last?.budgetUSD === 'number' && last.budgetUSD > 0) return last.budgetUSD;
+  return geo && /^us/i.test(geo) ? 2000 : 1000;
+}
+
 export async function collectContext(req: Request) {
   const geo = inferGeolocation(req);
   const language = inferLanguage(req);
@@ -43,8 +55,8 @@ export async function collectContext(req: Request) {
     destination: last.destination,
     start: last.dates?.start,
     end: last.dates?.end,
-    travelers: last.travelers,
-    budgetUSD: last.budgetUSD,
+    travelers: defaultTravelers(pastQueries, geo),
+    budgetUSD: defaultBudgetUSD(pastQueries, geo),
   };
   return { geo, language, device, pastQueries, defaults };
 }
