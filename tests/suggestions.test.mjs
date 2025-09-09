@@ -48,6 +48,7 @@ describe('scheduled suggestions', () => {
       dispatchEvent(evt){ (this.listeners[evt.type]||[]).forEach(fn=>fn(evt)); }
     }
     const form = new Elem();
+    const chipElems = ['balanced','budget','comfort','speed'].map(p=>{ const e=new Elem(); e.dataset={profile:p}; return e; });
     const elements = {
       f: form,
       loading: new Elem(),
@@ -84,7 +85,8 @@ describe('scheduled suggestions', () => {
     ['destination','start','end','travelers','budgetUSD'].forEach(n=>{ const el=new Elem(); form[n]=el; elements[n]=el; });
     global.document = {
       getElementById: id => elements[id],
-      querySelector: sel => { const m=sel.match(/input\[name="(.+)"\]/); return m?form[m[1]]:null; }
+      querySelector: sel => { const m=sel.match(/input\[name="(.+)"\]/); return m?form[m[1]]:null; },
+      querySelectorAll: sel => sel==='#prefChips .chip' ? chipElems : []
     };
     global.FormData = class { constructor(){ return { entries: ()=>[] }; } };
     global.navigator = { clipboard: { writeText: async()=>{} } };

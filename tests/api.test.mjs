@@ -55,6 +55,16 @@ describe('POST /suggest', () => {
     expect(Array.isArray(res.body.details)).toBe(true);
   });
 
+  it('accepts named preference profiles', async () => {
+    const res = await request(app)
+      .post('/suggest')
+      .send({ destination: 'Paris', start: '2025-05-01', end: '2025-05-05', travelers: 1, budgetUSD: 500, preferences: 'speed' })
+      .set('Content-Type', 'application/json');
+
+    expect(res.status).toBe(200);
+    expect(res.body.plan.summary.toLowerCase()).toContain('speed');
+  });
+
   it('reflects preferences in the plan', async () => {
     const base = { destination: 'Paris', start: '2025-05-01', end: '2025-05-05', travelers: 2, budgetUSD: 1000 };
     const resCost = await request(app)
@@ -110,6 +120,7 @@ describe('slider interactions', () => {
       dispatchEvent(evt){ (this.listeners[evt.type]||[]).forEach(fn=>fn(evt)); }
     }
     const form = new Elem();
+    const chipElems = ['balanced','budget','comfort','speed'].map(p=>{ const e=new Elem(); e.dataset={profile:p}; return e; });
     const elements = {
       f: form,
       loading: new Elem(),
@@ -146,7 +157,8 @@ describe('slider interactions', () => {
     ['destination','start','end','travelers','budgetUSD'].forEach(n=>{ const el=new Elem(); form[n]=el; elements[n]=el; });
     global.document = {
       getElementById:id=>elements[id],
-      querySelector:sel=>{ const m=sel.match(/input\[name="(.+)"\]/); return m?form[m[1]]:null; }
+      querySelector:sel=>{ const m=sel.match(/input\[name="(.+)"\]/); return m?form[m[1]]:null; },
+      querySelectorAll:sel=> sel==='#prefChips .chip' ? chipElems : []
     };
     global.FormData = class { constructor(){ return { entries: ()=>[] }; } };
     global.navigator = { clipboard: { writeText: async()=>{} } };
