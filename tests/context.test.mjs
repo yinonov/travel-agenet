@@ -14,6 +14,7 @@ process.env.HISTORY_FILE = HISTORY_FILE;
 process.env.NODE_ENV = 'test';
 process.env.MOCK_OPENAI = '1';
 
+const { defaultTravelers, defaultBudgetUSD, readPastQueries } = await import('../src/context.ts');
 const { app } = await import('../src/server.ts');
 
 async function resetHistory() {
@@ -46,6 +47,17 @@ describe('Context defaults', () => {
       .set('Content-Type', 'application/json');
     expect(res2.status).toBe(200);
     expect(res2.body.destination).toBe('Tokyo');
+  });
+});
+
+describe('default helpers', () => {
+  it('derive travelers and budget from last history entry', async () => {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const entry = { destination: 'X', dates: { start: '2025-01-01', end: '2025-01-02' }, travelers: 4, budgetUSD: 1500 };
+    await fs.writeFile(HISTORY_FILE, JSON.stringify([entry]));
+    const past = await readPastQueries();
+    expect(defaultTravelers(past, null)).toBe(4);
+    expect(defaultBudgetUSD(past, null)).toBe(1500);
   });
 });
 

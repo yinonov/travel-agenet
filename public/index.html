@@ -31,6 +31,11 @@
 
   <div id="pg" class="card">
     <h2>Playground</h2>
+    <div class="row" style="margin-bottom:8px">
+      <button type="button" onclick="applyPreset('solo')">Solo City</button>
+      <button type="button" onclick="applyPreset('family')">Family Fun</button>
+      <button type="button" onclick="applyPreset('luxury')">Luxury</button>
+    </div>
     <label>Destination <input id="pgDestination" type="text" placeholder="Bangkok, Thailand"/></label>
     <label>Travelers
       <div class="row">
@@ -124,6 +129,22 @@
       refine: out('refine')
     };
 
+    let currentPrefs = { comfort: 0.33, cost: 0.33, speed: 0.34 };
+    const presets = {
+      solo: { destination: 'Tokyo, Japan', days: 5, preferences: { comfort: 0.3, cost: 0.5, speed: 0.2 } },
+      family: { destination: 'Orlando, Florida', days: 7, preferences: { comfort: 0.5, cost: 0.3, speed: 0.2 } },
+      luxury: { destination: 'Paris, France', days: 4, preferences: { comfort: 0.6, cost: 0.2, speed: 0.2 } }
+    };
+    function applyPreset(name) {
+      const p = presets[name];
+      if (!p) return;
+      pg.destination.value = p.destination;
+      pg.days.value = p.days;
+      currentPrefs = p.preferences;
+      updatePgOut();
+      fetchPgEstimate();
+    }
+
     const updatePgOut = ()=>{
       pg.travelersOut.textContent = pg.travelers.value;
       pg.daysOut.textContent = pg.days.value;
@@ -209,6 +230,13 @@
       bInput.addEventListener('input', onSlider);
       ['destination','start','end'].forEach(n=>{ f[n].addEventListener('change', fetchEstimate); });
       updateSliderOut();
+      fetch('/context').then(r=>r.json()).then(ctx=>{
+        const d=ctx.defaults||{};
+        if (d.travelers) { pg.travelers.value = d.travelers; tInput.value = d.travelers; }
+        if (d.budgetUSD) { bInput.value = d.budgetUSD; }
+        updatePgOut();
+        updateSliderOut();
+      }).catch(()=>{});
 
     pg.refine.addEventListener('click', ()=>{
       f.hidden = false;
@@ -225,6 +253,7 @@
         const data = Object.fromEntries(new FormData(f).entries());
         data.travelers = Number(data.travelers||2);
         data.budgetUSD = Number(data.budgetUSD||2000);
+        data.preferences = currentPrefs;
         setLoading(true);
         try {
           const r = await fetch('/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
