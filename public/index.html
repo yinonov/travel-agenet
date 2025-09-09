@@ -15,6 +15,8 @@
     .muted{color:#6b7280}
     pre{white-space:pre-wrap;background:var(--g);padding:12px;border-radius:10px}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .chip{padding:4px 10px;border:1px solid var(--bd);border-radius:16px;background:var(--g);cursor:pointer}
+    .chip.selected{background:var(--b);color:#fff}
     .error{border-color:#fecaca;background:#fef2f2}
     .error-text{color:#b91c1c}
     .right{margin-left:auto}
@@ -50,6 +52,12 @@
       </div>
     </label>
     <div id="pgEstimate" class="muted" style="margin:8px 0"></div>
+    <div class="row" id="prefChips" style="margin-bottom:8px">
+      <button type="button" class="chip selected" data-profile="balanced">Balanced</button>
+      <button type="button" class="chip" data-profile="budget">Budget</button>
+      <button type="button" class="chip" data-profile="comfort">Comfort</button>
+      <button type="button" class="chip" data-profile="speed">Speed</button>
+    </div>
     <div class="row">
       <button id="refine" type="button">Refine my trip</button>
     </div>
@@ -129,18 +137,34 @@
       refine: out('refine')
     };
 
-    let currentPrefs = { comfort: 0.33, cost: 0.33, speed: 0.34 };
+    const profiles = {
+      balanced: { comfort: 0.33, cost: 0.33, speed: 0.34 },
+      budget: { comfort: 0.2, cost: 0.6, speed: 0.2 },
+      comfort: { comfort: 0.6, cost: 0.2, speed: 0.2 },
+      speed: { comfort: 0.2, cost: 0.2, speed: 0.6 }
+    };
+    let selectedProfile = 'balanced';
+    let currentPrefs = profiles[selectedProfile];
     const presets = {
       solo: { destination: 'Tokyo, Japan', days: 5, preferences: { comfort: 0.3, cost: 0.5, speed: 0.2 } },
       family: { destination: 'Orlando, Florida', days: 7, preferences: { comfort: 0.5, cost: 0.3, speed: 0.2 } },
       luxury: { destination: 'Paris, France', days: 4, preferences: { comfort: 0.6, cost: 0.2, speed: 0.2 } }
     };
+    const chips = document.querySelectorAll('#prefChips .chip');
+    chips.forEach(ch=>ch.addEventListener('click',()=>{
+      chips.forEach(c=>c.classList.remove('selected'));
+      ch.classList.add('selected');
+      selectedProfile = ch.dataset.profile;
+      currentPrefs = profiles[selectedProfile] || profiles.balanced;
+    }));
     function applyPreset(name) {
       const p = presets[name];
       if (!p) return;
       pg.destination.value = p.destination;
       pg.days.value = p.days;
       currentPrefs = p.preferences;
+      selectedProfile = null;
+      chips.forEach(c=>c.classList.remove('selected'));
       updatePgOut();
       fetchPgEstimate();
     }
@@ -253,7 +277,7 @@
         const data = Object.fromEntries(new FormData(f).entries());
         data.travelers = Number(data.travelers||2);
         data.budgetUSD = Number(data.budgetUSD||2000);
-        data.preferences = currentPrefs;
+        data.preferences = selectedProfile || currentPrefs;
         setLoading(true);
         try {
           const r = await fetch('/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});

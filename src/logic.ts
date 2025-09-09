@@ -5,7 +5,7 @@ export type SuggestRequest = {
   dates?: { start?: string; end?: string };
   travelers: number;
   budgetUSD: number;
-  preferences?: { comfort?: number; cost?: number; speed?: number };
+  preferences?: { comfort?: number; cost?: number; speed?: number } | string;
 };
 
 export type PlanCore = {
@@ -62,23 +62,40 @@ export function validateSuggestRequest(body: Partial<SuggestRequest> = {}): {
   if (!Number.isFinite(budgetUSD) || budgetUSD <= 0) errors.push({ field: 'budgetUSD', message: 'budgetUSD must be a number > 0' });
   else out.budgetUSD = budgetUSD;
 
-  const defaultPrefs = { comfort: 0.33, cost: 0.33, speed: 0.34 };
-  const prefsIn = body.preferences || {};
-  const parsePref = (name: keyof typeof defaultPrefs) => {
-    const raw = (prefsIn as any)[name];
-    if (raw === undefined) return defaultPrefs[name];
-    const num = Number(raw);
-    if (!Number.isFinite(num) || num < 0 || num > 1) {
-      errors.push({ field: `preferences.${name}`, message: `${name} must be between 0 and 1` });
-      return defaultPrefs[name];
+  const profileDefaults = {
+    balanced: { comfort: 0.33, cost: 0.33, speed: 0.34 },
+    budget: { comfort: 0.2, cost: 0.6, speed: 0.2 },
+    comfort: { comfort: 0.6, cost: 0.2, speed: 0.2 },
+    speed: { comfort: 0.2, cost: 0.2, speed: 0.6 }
+  } as const;
+  const defaultPrefs = profileDefaults.balanced;
+  const prefsIn = body.preferences;
+  if (typeof prefsIn === 'string') {
+    const prof = (profileDefaults as any)[prefsIn];
+    if (!prof) {
+      errors.push({ field: 'preferences', message: 'unknown profile' });
+      out.preferences = defaultPrefs;
+    } else {
+      out.preferences = prof;
     }
-    return num;
-  };
-  out.preferences = {
-    comfort: parsePref('comfort'),
-    cost: parsePref('cost'),
-    speed: parsePref('speed')
-  };
+  } else {
+    const rawObj = prefsIn || {};
+    const parsePref = (name: keyof typeof defaultPrefs) => {
+      const raw = (rawObj as any)[name];
+      if (raw === undefined) return defaultPrefs[name];
+      const num = Number(raw);
+      if (!Number.isFinite(num) || num < 0 || num > 1) {
+        errors.push({ field: `preferences.${name}`, message: `${name} must be between 0 and 1` });
+        return defaultPrefs[name];
+      }
+      return num;
+    };
+    out.preferences = {
+      comfort: parsePref('comfort'),
+      cost: parsePref('cost'),
+      speed: parsePref('speed')
+    };
+  }
 
   return { valid: errors.length === 0, errors, value: errors.length ? null : out };
 }
