@@ -49,3 +49,17 @@ describe('Context defaults', () => {
   });
 });
 
+describe('UI markup', () => {
+  it('only uses range inputs for budgetUSD, travelers, and lengthDays', async () => {
+    const html = await fs.readFile(path.join(ROOT, 'public/index.html'), 'utf8');
+    const matches = [...html.matchAll(/<input[^>]*type="range"[^>]*>/g)];
+    const allowed = ['pgTravelers', 'pgDays', 'travelers', 'budgetUSD'];
+    const found = matches.map(m => {
+      const id = m[0].match(/id="([^"]+)"/);
+      const name = m[0].match(/name="([^"]+)"/);
+      return id?.[1] || name?.[1];
+    });
+    expect(found.sort()).toEqual(allowed.sort());
+  });
+});
+
