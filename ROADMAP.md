@@ -20,7 +20,7 @@
 ## Later (Week 4–6)
 
 - [ ] Add one real datasource (Duffel/Skyscanner/Amadeus sandbox) server-side.
-- [ ] Expose `flightSearch`, `hotelLookup` as server functions (pre-MCP).
+- [x] Expose `flightSearch`, `hotelLookup` as server functions (pre-MCP).
 - [ ] Rate limits + schema hardening.
 - [ ] Metrics dashboard page.
 
@@ -45,3 +45,4 @@
 - 2025‑09‑07: Chose Render Web Service for deployment; added `render.yaml` blueprint with auto‑deploy on merges to `main`.
 - 2025‑09‑07: Enabled Render PR previews in `render.yaml` and added a "Deploy to Render" button in README for easy sharing.
 - 2025‑09‑07: Added metrics logging (CSV) with latency and token usage.
+- 2025‑09‑10: Introduced internal `flightSearch` and `hotelLookup` modules for modular planning.

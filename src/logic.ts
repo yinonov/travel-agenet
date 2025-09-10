@@ -1,3 +1,5 @@
+import { mainPreference, hotelLookup, flightSearch } from './tools.js';
+
 export type SuggestRequest = {
   destination: string;
   start?: string; // legacy flat fields supported
@@ -100,6 +102,7 @@ export function validateSuggestRequest(body: Partial<SuggestRequest> = {}): {
   return { valid: errors.length === 0, errors, value: errors.length ? null : out };
 }
 
+
 export function mockPlan({ destination, dates, travelers, budgetUSD, preferences }: PlanCore): PlanCore & {
   plan: {
     summary: string;
@@ -108,22 +111,9 @@ export function mockPlan({ destination, dates, travelers, budgetUSD, preferences
     mustDo: string[];
   };
 } {
-  const main = ((): 'comfort' | 'cost' | 'speed' => {
-    const { comfort, cost, speed } = preferences;
-    if (cost >= comfort && cost >= speed) return 'cost';
-    if (comfort >= cost && comfort >= speed) return 'comfort';
-    return 'speed';
-  })();
-
-  const hotelDivisors =
-    main === 'comfort' ? [8, 10, 12] : main === 'cost' ? [12, 14, 16] : [10, 12, 14];
-
-  const flightNotes =
-    main === 'speed'
-      ? 'Aim for direct flights or minimal layovers to save time.'
-      : main === 'comfort'
-      ? 'Consider premium seating or lay-flat options for comfort.'
-      : 'Consider budget airlines and flexible dates to save money.';
+  const main = mainPreference(preferences);
+  const hotels = hotelLookup(destination, budgetUSD, preferences);
+  const flights = flightSearch(destination, preferences);
 
   return {
     destination,
@@ -133,12 +123,8 @@ export function mockPlan({ destination, dates, travelers, budgetUSD, preferences
     preferences,
     plan: {
       summary: `A ${main}-focused plan for ${destination} (${dates.start}→${dates.end}) for ${travelers}.`,
-      hotelIdeas: [
-        { name: 'Central Stay', area: 'Downtown', estPricePerNightUSD: Math.round(budgetUSD / hotelDivisors[0]) },
-        { name: 'Cozy Corner', area: 'Old Town', estPricePerNightUSD: Math.round(budgetUSD / hotelDivisors[1]) },
-        { name: 'Transit Hub Inn', area: 'Near Station', estPricePerNightUSD: Math.round(budgetUSD / hotelDivisors[2]) }
-      ],
-      flightNotes,
+      hotelIdeas: hotels,
+      flightNotes: flights.notes,
       mustDo: ['City highlights', 'Local market', 'Neighborhood food tour']
     }
   };

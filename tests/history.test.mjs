@@ -8,13 +8,14 @@ import vm from 'vm';
 process.env.NODE_ENV = 'test';
 process.env.MOCK_OPENAI = '1';
 
-const { app } = await import('../src/server.ts');
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.join(__dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data');
-const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const HISTORY_FILE = path.join(DATA_DIR, 'history.test.json');
+process.env.HISTORY_FILE = HISTORY_FILE;
+
+const { app } = await import('../src/server.ts');
 
 async function resetHistory(){
   try { await fs.rm(HISTORY_FILE, { force: true }); } catch {}
